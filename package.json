@@ -1,6 +1,6 @@
 {
   "name": "model-x",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Advanced model for javascript applications",
   "main": "./dist/index.js",
   "scripts": {
