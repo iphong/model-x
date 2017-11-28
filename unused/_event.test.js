@@ -1,0 +1,36 @@
+import Events from './_event'
+
+describe('Events', () => {
+	it('should add/remove listeners', async () => {
+		const events = new Events()
+		const callback1 = jest.fn()
+		const callback2 = jest.fn()
+		events.addListener('foo', callback1)
+		events.addListener('foo', callback1)
+		events.addListener('foo', callback2)
+		events.addListener('bar', callback2)
+		expect(events.totalListeners()).toBe(4)
+		events.removeListener('foo', callback2)
+		expect(events.totalListeners()).toBe(3)
+		events.removeListener('foo', callback1)
+		expect(events.totalListeners()).toBe(1)
+		events.removeListener('bar')
+		expect(events.totalListeners()).toBe(0)
+	})
+	it('should emit events', async () => {
+		const events = new Events()
+		const callback = jest.fn()
+		events.addListener('foo', callback)
+		await events.emit('foo', 'bar')
+		expect(callback.mock.calls.length).toBe(1)
+		expect(callback.mock.calls[0][0]).toBe('bar')
+	})
+	it('should emit only once', async () => {
+		const events = new Events()
+		const callback = jest.fn()
+		events.once('foo', callback)
+		await events.emit('foo')
+		await events.emit('foo')
+		expect(callback.mock.calls.length).toBe(1)
+	})
+})

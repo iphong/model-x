@@ -1,0 +1,21 @@
+<component name="libraryTable">
+  <library name="Generated files" type="javaScript">
+    <CLASSES>
+      <root url="file://$PROJECT_DIR$/dist/test/Model.test.js" />
+      <root url="file://$PROJECT_DIR$/dist/src/Events.js" />
+      <root url="file://$PROJECT_DIR$/dist/demo/test.js" />
+      <root url="file://$PROJECT_DIR$/dist/rollup.config.js" />
+      <root url="file://$PROJECT_DIR$/dist/src/Promise.js" />
+      <root url="file://$PROJECT_DIR$/dist/src/_events.js" />
+      <root url="file://$PROJECT_DIR$/dist/src/_model.js" />
+      <root url="file://$PROJECT_DIR$/dist/src/_model.test.js" />
+      <root url="file://$PROJECT_DIR$/dist/src/event.js" />
+      <root url="file://$PROJECT_DIR$/dist/src/model.js" />
+      <root url="file://$PROJECT_DIR$/dist/src/model.test.js" />
+      <root url="file://$PROJECT_DIR$/dist/src/mutate.js" />
+      <root url="file://$PROJECT_DIR$/dist/src/observe.demo.js" />
+      <root url="file://$PROJECT_DIR$/dist/src/observe.js" />
+    </CLASSES>
+    <SOURCES />
+  </library>
+</component>
