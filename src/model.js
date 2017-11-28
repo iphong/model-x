@@ -103,19 +103,19 @@ function observers(obj, type) {
 // Attach observer to object
 function observe(target, type, observer) {
 	const obj = model(target)
-	if (!obj) return
+	if (!obj || typeof obj !== 'object') return
 	if (typeof type === 'function') {
 		observer = type
 		type = void 0
 	}
 	const map = observers(obj).set(observer, type)
 	return map.delete.bind(map, observer)
-
 }
 // Trigger events to object
 function trigger(target, type, payload) {
 	const obj = model(target)
 	return new Promise(resolve => {
+		if (!obj || typeof obj !== 'object') resolve()
 		setTimeout(async () => {
 			for (const [fn, e] of observers(obj).entries()) {
 				if (e && e.test && e.test(type)) await fn(payload)
@@ -258,6 +258,11 @@ function proxy(obj = {}) {
 	return obj[PROXY]
 }
 
-const Model = { proxy, listen, observe, trigger, update }
-
-export default Model
+export default Object.assign(
+	Object.create(null, {
+		[Symbol.toStringTag]: {
+			value: '[[ ModelX :: by Phong Vu ]]'
+		}
+	}),
+	{ proxy, listen, observe, trigger, update }
+)
