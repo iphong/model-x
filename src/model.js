@@ -19,14 +19,14 @@ const defaultOptions = {
 
 let counter = 1
 // Set and return unique id
-export function id(obj) {
+function id(obj) {
 	if (!obj) return
 	if (!obj[ID]) define(obj, ID, counter++)
 	return obj[ID]
 }
 // Set property
-export function define(obj, key, value) {
-	if (!obj) return
+function define(obj, key, value) {
+	if (!obj || typeof obj !== 'object') return
 	Object.defineProperty(obj, key, {
 		value,
 		writable: true,
@@ -34,21 +34,21 @@ export function define(obj, key, value) {
 	})
 }
 // Set pending status
-export function pending(obj) {
+function pending(obj) {
 	define(obj, PENDING, true)
 }
 // Clear pending status
-export function release(obj) {
+function release(obj) {
 	define(obj, PENDING, false)
 }
 // Check for pending status
-export function available(obj) {
+function available(obj) {
 	if (!obj) return
 	return !obj[PENDING] && !!queue(obj, QUEUE, Array).length
 }
 
 // Make observability
-export function prepare(obj, { relation, parent, path } = {}) {
+function prepare(obj, { relation, parent, path } = {}) {
 	if (!obj || !obj[ID]) {
 		let name = 'Model'
 		if (Array.isArray(obj)) name = 'List'
@@ -62,24 +62,28 @@ export function prepare(obj, { relation, parent, path } = {}) {
 	return obj
 }
 // Clear all private props
-export function cleanup(obj, options = {}) {
+function cleanup(obj, options = {}) {
 	if (!obj) return
 	// lets trigger its subscribers before deleting
-	for (const [key, value] of Object.entries(obj))
-		if (value instanceof Object) cleanup(value)
-	Object.getOwnPropertySymbols(obj).forEach(symbol => delete obj[symbol])
-	trigger(obj, 'delete')
-	notifyParent(obj, 'delete')
-	return obj
+	return new Promise(async resolve => {
+		for (const [key, value] of Object.entries(obj))
+			if (value instanceof Object) await cleanup(value)
+
+		await trigger(obj, 'delete', options)
+		await notifyParent(obj, 'delete', options)
+
+		Object.getOwnPropertySymbols(obj).forEach(symbol => delete obj[symbol])
+		resolve()
+	})
 }
 
 // Get the queue stack
-export function queue(obj) {
+function queue(obj) {
 	if (!obj[QUEUE]) define(obj, QUEUE, [])
 	return obj[QUEUE]
 }
 // Invoke the next action in queue
-export function invoke(target) {
+function invoke(target) {
 	const obj = model(target)
 	if (available(obj)) {
 		pending(obj)
@@ -92,12 +96,12 @@ export function invoke(target) {
 }
 
 // Get all observers
-export function observers(obj, type) {
+function observers(obj, type) {
 	if (!obj[LISTENERS]) define(obj, LISTENERS, new Map())
 	return obj[LISTENERS]
 }
 // Attach observer to object
-export function observe(target, type, observer) {
+function observe(target, type, observer) {
 	const obj = model(target)
 	if (!obj) return
 	if (typeof type === 'function') {
@@ -109,9 +113,8 @@ export function observe(target, type, observer) {
 
 }
 // Trigger events to object
-export function trigger(target, type, payload) {
+function trigger(target, type, payload) {
 	const obj = model(target)
-	if (!obj || !type) return
 	return new Promise(resolve => {
 		setTimeout(async () => {
 			for (const [fn, e] of observers(obj).entries()) {
@@ -124,7 +127,7 @@ export function trigger(target, type, payload) {
 	})
 }
 // Notify parents recursively on each event
-export function notifyParent(obj, type, payload) {
+function notifyParent(obj, type, payload) {
 	return new Promise(async resolve => {
 		if (!obj) return resolve()
 		const parent = obj[PARENT]
@@ -138,7 +141,7 @@ export function notifyParent(obj, type, payload) {
 }
 
 // Mutate object by key value pair
-export function change(target, key, value, options) {
+function change(target, key, value, options) {
 	const obj = model(target)
 	if (!obj || !key) return
 	const opts = { ...defaultOptions, ...options }
@@ -147,22 +150,23 @@ export function change(target, key, value, options) {
 		const relation = key
 		const child = obj[key]
 		const path = [...opts.path, key]
-		if (typeof child === 'object') {
-			if (typeof value === 'object') {
-				update(child, value, { path, parent })
+		if (child && typeof child === 'object') {
+			if (value && typeof value === 'object') {
+				await update(child, value, { path, parent })
 			} else {
-				cleanup(child, { key, parent })
+				await cleanup(child, { key, parent })
 				// in case obj is a Proxy, this ensure deleteProperty trap is called
 				delete obj[key]
 				obj[key] = value
 			}
 		} else {
-			if (typeof value === 'object') {
+			if (value && typeof value === 'object') {
 				if (Array.isArray(value)) obj[key] = []
 				else obj[key] = {}
-				prepare(obj[key], { path, parent, relation })
-				update(obj[key], value, { path, parent })
+				await prepare(obj[key], { path, parent, relation })
+				await update(obj[key], value, { path, parent })
 			} else {
+				delete obj[key]
 				obj[key] = value
 			}
 		}
@@ -174,7 +178,8 @@ export function change(target, key, value, options) {
 	})
 }
 // Mutate object with an attrs set
-export function update(target, props = {}, options) {
+function update(target, props = {}, options) {
+	if (!target || typeof target !== 'object') return
 	const obj = model(target)
 	if (!obj || !props) return
 	const opts = { ...defaultOptions, ...options }
@@ -191,13 +196,14 @@ export function update(target, props = {}, options) {
 			if (!opts.silent) {
 				await trigger(obj, 'update', { changes, previous })
 			}
-			resolve()
+			await resolve()
 		})
 		invoke(obj)
 	})
 }
 // Listener specifically for handle data mutations
-export function listen(obj, type, listener) {
+function listen(obj, type, listener) {
+	if (!obj || typeof obj !== 'object') return
 	switch (type) {
 		case 'update':
 			return observe(obj, type, ({ changes, previous }) => {
@@ -211,19 +217,21 @@ export function listen(obj, type, listener) {
 }
 
 // Get reference
-export function model(obj) {
+function model(obj = {}) {
 	return prepare(obj[MODEL] || obj)
 }
-export function proxy(obj) {
+function proxy(obj = {}) {
 	if (!obj[PROXY]) {
 		define(
-			model(obj),
+			obj,
 			PROXY,
 			new Proxy(obj, {
 				get(target, prop) {
 					switch (prop) {
 						case 'prototype':
 							return target[prop]
+						case PROXY:
+							return target[PROXY]
 						case MODEL:
 							return target
 					}
@@ -245,10 +253,11 @@ export function proxy(obj) {
 				}
 			})
 		)
+		prepare(obj)
 	}
 	return obj[PROXY]
 }
 
-const Model = { proxy, listen, observe, trigger, update, change }
+const Model = { proxy, listen, observe, trigger, update }
 
 export default Model

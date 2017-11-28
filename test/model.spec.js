@@ -1,4 +1,7 @@
-import { observe, update, proxy, listen } from '../src/model'
+// const { update, proxy, listen } = require('../dist')
+import ModelX from '../src/model'
+
+const { update, proxy, listen } = ModelX
 
 const state = proxy({})
 const items = proxy([])
