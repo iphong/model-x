@@ -1,8 +1,8 @@
 {
   "name": "model-x",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Advanced model for javascript applications",
-  "main": "./dist/index.js",
+  "main": "./dist",
   "scripts": {
     "rollup": "rollup --watch -c rollup.config.js",
     "test": "jest"
