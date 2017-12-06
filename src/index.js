@@ -1,12 +1,6 @@
-
-
 /*
  * Copyright (c) 2017. Developed by Phong Vu
  */
-
-Object.defineProperty(exports, Symbol.toStringTag, {
-	value: '[[ ModelX :: by Phong Vu ]]'
-})
 
 const LISTENERS = Symbol('listeners')
 const INTERCEPTORS = Symbol('interceptors')
@@ -208,16 +202,6 @@ export function observable(obj = {}) {
 					const result = target[prop]
 					if (typeof result === 'function') {
 						return result
-						// return (...args) => new Promise(resolve => {
-						// 	queue(target).push(async () => {
-						// 		let output = await result.apply(target, args)
-						// 		if (output && output instanceof Object) {
-						// 			output = observable(output)
-						// 		}
-						// 		resolve(output)
-						// 	})
-						// 	invoke(obj)
-						// })
 					}
 					if (result && result instanceof Object) {
 						define(result, PARENT, target)
