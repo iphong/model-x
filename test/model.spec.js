@@ -1,54 +1,56 @@
-// const { update, observable, listen } = require('../src/model')
-import { observable, observe, intercept, update } from '../src/index'
+const { change, update, observable, observe, intercept } = require('../dist')
 
-const state = {
-	@observable items: []
+const state = {}
+const observer = id => async (key, next, prev) => {
+	await new Promise(resolve => {
+		setTimeout(() => {
+			console.log(`[${id}]`, key, ' --> ', next)
+			resolve()
+		}, 500)
+	})
 }
-const store = observable(state)
+intercept(state, 'foo', value => `foo( ${value} )`)
+intercept(state, 'bar', value => `bar( ${value} )`)
+intercept(state, value => `$$( ${value} )`)
 
-// intercept(state, 'foo', value => `wrapped(${value})`)
-intercept(state, 'foo', value => `$$--${value}--$$`)
+observe(state, observer(1))
+observe(state, observer(2))
 
-// observe(store, console.log)
-
-update(store).then(() => {
-	console.log(store)
+update(state, { foo: 'something' }).then(() => {
+	console.log('')
+	console.log('---  updated "foo"', state.foo === 'something')
+	console.log('')
 })
-update(store, { 0: 'bar', 2: 'foo', 1: [1,2], a: 'what' }).then(() => {
-	console.log(store)
+update(state, { bar: 'another' }).then(() => {
+	console.log('')
+	console.log('---  updated "bar"', state.bar === 'another')
+	console.log('')
+})
+update(state, { bar: 'new value' }).then(() => {
+	console.log('')
+	console.log('---  updated "bar"', state.bar === 'new value')
+	console.log('')
 })
 
-// update(items, { 0: 'hello' })
-//
-// const observer = id => async ({ type, value, changes }) => {
-// 	await new Promise(resolve => {
-// 		setTimeout(() => {
-// 			console.log(`[${id}]`, type, ' --> ', changes || value)
-// 			resolve()
-// 		}, 500)
-// 	})
-// }
-//
-// observe(state, observer(1))
-// observe(state, observer(2))
-//
-// listen(state, 'update', (next, prev) =>
-// 	console.log(`state update ---> `, prev, `--->`, next)
-// )
-// listen(state, /^change:foo/, value => console.log(`state.foo changed`))
-//
-// update(state, { foo: 'something' }).then(() => {
-// 	console.log('')
-// 	console.log('---  updated "foo"', state.foo === 'something')
-// 	console.log('')
-// })
-// update(state, { bar: 'another' }).then(() => {
-// 	console.log('')
-// 	console.log('---  updated "bar"', state.bar === 'another')
-// 	console.log('')
-// })
-// update(state, { bar: 'new value' }).then(() => {
-// 	console.log('')
-// 	console.log('---  updated "bar"', state.bar === 'new value')
-// 	console.log('')
-// })
+
+const app = observable({ a: { b: { c: 1 } } })
+
+// intercept(app, value => [value])
+// intercept(app.a.b, value => [value])
+
+app.a.b.c = 4
+app.a.b.c = 2
+app.a.b.c = 'foo'
+app.a.b.c = 'bar'
+app.a.b.d = 5
+app.a.foo = 'bar'
+app.a.d = {}
+app.a.d.bar = 'foo'
+change(app, 'b', []).then(() => {
+	app.b.push('A')
+	app.b.push('B')
+	app.b.push({ x: { y: 'z' } })
+	app.b[2].x.y = 'ZZZ'
+})
+
+observe(app, (key, next) => console.log(key, '-->', next))

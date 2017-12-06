@@ -7,7 +7,5 @@ export default {
 		format: 'cjs',
 		file: './dist/index.js'
 	},
-	plugins: [babel({
-		plugins: ['external-helpers']
-	})]
+	plugins: [babel()]
 }

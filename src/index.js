@@ -8,9 +8,9 @@ const RELATION = Symbol('relation')
 const PENDING = Symbol('pending')
 const OPTIONS = Symbol('options')
 const PARENT = Symbol('parent')
-const PROXY = Symbol('observable')
+const PROXY = Symbol('proxy')
 const QUEUE = Symbol('queue')
-const MODEL = Symbol('instance')
+const TARGET = Symbol('target')
 const PATH = Symbol('path')
 const ID = Symbol('id')
 
@@ -54,26 +54,13 @@ export function available(obj) {
 }
 // Make observability
 export function prepare(obj) {
-	if (!obj || !obj[ID]) {
-		let name = 'Model'
-		if (Array.isArray(obj)) name = 'List'
-		id(obj)
+	if (obj && !obj[ID]) {
+		const name = 'Model'
 		define(obj, Symbol.toStringTag, `${name}#${id(obj)}`)
 		define(obj, Symbol.toPrimitive, () => obj.toString())
+		define(obj, TARGET, obj)
 	}
 	return obj
-}
-// Clear all private props
-export function cleanup(obj, options = {}) {
-	if (!obj) return
-	// lets trigger its subscribers before deleting
-	return new Promise(async resolve => {
-		for (const [key, value] of Object.entries(obj))
-			if (value instanceof Object) await cleanup(value)
-
-		Object.getOwnPropertySymbols(obj).forEach(symbol => delete obj[symbol])
-		resolve()
-	})
 }
 // Get the queue stack
 export function queue(obj) {
@@ -82,7 +69,7 @@ export function queue(obj) {
 }
 // Invoke the next action in queue
 export function invoke(target) {
-	const obj = model(target)
+	const obj = reference(target)
 	if (available(obj)) {
 		pending(obj)
 		return new Promise(async resolve => {
@@ -94,29 +81,37 @@ export function invoke(target) {
 }
 // Get all listeners
 export function listeners(target, type) {
-	const obj = model(target)
+	const obj = reference(target)
 	if (!obj[LISTENERS]) define(obj, LISTENERS, new Map())
 	return obj[LISTENERS]
 }
 // Get all interceptors
 export function interceptors(target, type) {
-	const obj = model(target)
+	const obj = reference(target)
 	if (!obj[INTERCEPTORS]) define(obj, INTERCEPTORS, new Map())
 	return obj[INTERCEPTORS]
 }
 // Attach listener to object
 export function listen(obj, type, listener) {
-	const map = listeners(obj).set(listener, type)
+	let map
+	if (typeof type === 'function' && !listener)
+		map = listeners(obj).set(type)
+	else
+		map = listeners(obj).set(listener, type)
 	return map.delete.bind(map, listener)
 }
 // Intercept values
 export function intercept(obj, key, interceptor) {
-	const map = interceptors(obj).set(interceptor, key)
+	let map
+	if (typeof key === 'function' && !interceptor)
+		map = interceptors(obj).set(key)
+	else
+		map = interceptors(obj).set(interceptor, key)
 	return map.delete.bind(map, interceptor)
 }
 // Trigger events to object
 export function trigger(target, type, payload) {
-	const obj = model(target)
+	const obj = reference(target)
 	return new Promise(async resolve => {
 		for (const [fn, e] of listeners(obj).entries()) {
 			if (e && e.test && e.test(type)) await fn(payload)
@@ -128,26 +123,34 @@ export function trigger(target, type, payload) {
 // Mutate object by key value pair
 export function change(target, key, value, options) {
 	const opts = { ...defaultOptions, ...options }
-	const obj = model(target)
+	const obj = reference(target)
 	return new Promise(async resolve => {
 		const prev = obj[key]
 		let next = value
 		for (const [interceptor, k] of interceptors(obj).entries())
-			if (k === key) next = await interceptor.call(obj, next, obj)
-		if (next !== prev) {
-			obj[key] = next
-			if (!opts.silent) {
-				if (prev === void 0) {
-					await trigger(obj, `create`, { key, next, prev })
-					await trigger(obj, `create:${key}`, { next, prev })
-				}
-				if (next === void 0) {
-					await trigger(obj, `delete`, { key, next, prev })
-					await trigger(obj, `delete:${key}`, { next, prev })
-				}
-				await trigger(obj, `change:${key}`, { next, prev })
-				await trigger(obj, `change`, { key, next, prev })
-			}
+			if (k === key || !k) next = await interceptor(next, key, obj)
+		obj[key] = next
+		if (next && typeof next === 'object') {
+			if (!prev || typeof prev !== 'object')
+				obj[key] = Array.isArray(next) ? [] : {}
+			await update(obj[key], next, opts)
+		}
+		if (!opts.silent) {
+			await triggerParent(obj, key, next, prev)
+			await trigger(obj, `change`, { key, next, prev })
+		}
+		await resolve()
+	})
+}
+export function triggerParent(obj, key, next, prev) {
+	return new Promise(async resolve => {
+		let parent = obj
+		const path = [key]
+		while (parent && parent[PARENT]) {
+			path.unshift(parent[RELATION])
+			const k = path.join('.')
+			await trigger(parent[PARENT], 'change', { key: k, next, prev })
+			parent = parent[PARENT]
 		}
 		await resolve()
 	})
@@ -155,7 +158,7 @@ export function change(target, key, value, options) {
 // Mutate object with an attrs set
 export function update(target, props = {}, options) {
 	const opts = { ...defaultOptions, ...options }
-	const obj = model(target)
+	const obj = reference(target)
 	const next = {}
 	const prev = {}
 	return new Promise(resolve => {
@@ -166,61 +169,64 @@ export function update(target, props = {}, options) {
 				next[key] = obj[key]
 				prev[key] = previous[key]
 			}
-			if (!opts.silent) {
-				await trigger(obj, 'update', {
-					next,
-					prev
-				})
-			}
 			await resolve()
 		})
 		invoke(obj)
 	})
 }
 // Listener specifically for handle data mutations
-export function observe(obj, attr, handler) {
-	switch (typeof attr) {
-		case 'string':
-		case 'number':
-			return listen(obj, `change:${attr}`, ({ next, prev }) => {
-				return handler(next, prev)
-			})
-		case 'function':
-			return listen(obj, 'change', ({ key, next, prev }) => {
-				return attr(key, next, prev)
-			})
-	}
+export function observe(obj, prop, observer) {
+	return new Promise(resolve => {
+		listen(obj, 'change', async ({ key, next, prev }) => {
+			if (typeof prop === 'function' && !observer)
+				await prop(key, next, prev)
+			else if (typeof prop === 'string' && typeof observer === 'function')
+				await observer(next, prev)
+			await resolve()
+		})
+	})
 }
 // Get reference
-export function model(obj = {}) {
-	return obj[MODEL] || obj
+export function reference(obj = {}) {
+	return obj[TARGET] || obj
 }
 // Create a observable proxy
 export function observable(obj = {}) {
-	if (obj === null) obj = {}
 	if (!obj[PROXY]) {
 		define(
 			obj,
 			PROXY,
 			new Proxy(obj, {
 				get(target, prop) {
-					switch (prop) {
-						case 'prototype':
-							return target[prop]
-						case PROXY:
-							return target[PROXY]
-						case MODEL:
-							return target
+					if (prop === TARGET) return target
+					const result = target[prop]
+					if (typeof result === 'function') {
+						return result
+						// return (...args) => new Promise(resolve => {
+						// 	queue(target).push(async () => {
+						// 		let output = await result.apply(target, args)
+						// 		if (output && output instanceof Object) {
+						// 			output = observable(output)
+						// 		}
+						// 		resolve(output)
+						// 	})
+						// 	invoke(obj)
+						// })
 					}
-					return target[prop]
+					if (result && result instanceof Object) {
+						define(result, PARENT, target)
+						define(result, RELATION, prop)
+						return observable(result)
+					}
+					return result
 				},
 				set(target, prop, value) {
-					update(target, { [prop]: value })
+					change(target, prop, value)
 					return true
 				},
-				apply(fn, ctx, args) {
-					const result = fn.apply(ctx, args)
-					if (result instanceof Object) {
+				apply(fn, target, args) {
+					const result = fn.apply(target, args)
+					if (result && result instanceof Object) {
 						return observable(result)
 					}
 					return result
