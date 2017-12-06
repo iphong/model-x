@@ -1,11 +1,13 @@
 import babel from 'rollup-plugin-babel'
 
 export default {
-	input: './src/model.js',
+	input: './src/index.js',
 	output: {
 		name: 'ModelX',
-		format: 'umd',
-		file: './dist/model.js'
+		format: 'cjs',
+		file: './dist/index.js'
 	},
-	plugins: [babel()]
+	plugins: [babel({
+		plugins: ['external-helpers']
+	})]
 }

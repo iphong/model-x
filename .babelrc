@@ -3,6 +3,7 @@
 		"transform-decorators-legacy"
 	],
 	"presets": [
+		["es2015", { "modules": false }],
 		"stage-0",
 		"flow"
 	]
