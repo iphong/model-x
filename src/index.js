@@ -1,3 +1,9 @@
+
+
+/*
+ * Copyright (c) 2017. Developed by Phong Vu
+ */
+
 Object.defineProperty(exports, Symbol.toStringTag, {
 	value: '[[ ModelX :: by Phong Vu ]]'
 })
