@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017. Developed by Phong Vu
+ * Copyright (c) 2018. Developed by Phong Vu
  */
 
 const LISTENERS = Symbol('listeners')
@@ -55,8 +55,7 @@ export function available(obj) {
 // Make observability
 export function prepare(obj) {
 	if (obj && !obj[ID]) {
-		const name = 'Model'
-		define(obj, Symbol.toStringTag, `${name}#${id(obj)}`)
+		define(obj, Symbol.toStringTag, `observable(#${id(obj)})`)
 		define(obj, Symbol.toPrimitive, () => obj.toString())
 		define(obj, TARGET, obj)
 	}
@@ -142,6 +141,7 @@ export function change(target, key, value, options) {
 		await resolve()
 	})
 }
+
 export function triggerParent(obj, key, next, prev) {
 	return new Promise(async resolve => {
 		let parent = obj
@@ -176,14 +176,11 @@ export function update(target, props = {}, options) {
 }
 // Listener specifically for handle data mutations
 export function observe(obj, prop, observer) {
-	return new Promise(resolve => {
-		listen(obj, 'change', async ({ key, next, prev }) => {
-			if (typeof prop === 'function' && !observer)
-				await prop(key, next, prev)
-			else if (typeof prop === 'string' && typeof observer === 'function')
-				await observer(next, prev)
-			await resolve()
-		})
+	return listen(obj, 'change', async ({ key, next, prev }) => {
+		if (typeof prop === 'function' && !observer)
+			await prop(key, next, prev)
+		else if (typeof prop === 'string' && typeof observer === 'function')
+			await observer(next, prev)
 	})
 }
 // Get reference
@@ -227,3 +224,12 @@ export function observable(obj = {}) {
 	}
 	return obj[PROXY]
 }
+
+// export default {
+// 	observe,
+// 	update,
+// 	trigger,
+// 	change,
+// 	listen,
+// 	intercept
+// }

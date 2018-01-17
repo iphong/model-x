@@ -1,10 +1,12 @@
 /*
- * Copyright (c) 2017. Developed by Phong Vu
+ * Copyright (c) 2018. Developed by Phong Vu
  */
 
-'use strict';
-
-Object.defineProperty(exports, '__esModule', { value: true });
+(function (global, factory) {
+	typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
+	typeof define === 'function' && define.amd ? define(['exports'], factory) :
+	(factory((global.ModelX = {})));
+}(this, (function (exports) { 'use strict';
 
 var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
 
@@ -13,10 +15,6 @@ function _asyncToGenerator(fn) { return function () { var gen = fn.apply(this, a
 /*
  * Copyright (c) 2017. Developed by Phong Vu
  */
-
-Object.defineProperty(exports, Symbol.toStringTag, {
-	value: '[[ ModelX :: by Phong Vu ]]'
-});
 
 const LISTENERS = Symbol('listeners');
 const INTERCEPTORS = Symbol('interceptors');
@@ -69,8 +67,7 @@ function available(obj) {
 // Make observability
 function prepare(obj) {
 	if (obj && !obj[ID]) {
-		const name = 'Model';
-		define(obj, Symbol.toStringTag, `${name}#${id(obj)}`);
+		define(obj, Symbol.toStringTag, `observable(#${id(obj)})`);
 		define(obj, Symbol.toPrimitive, () => obj.toString());
 		define(obj, TARGET, obj);
 	}
@@ -165,6 +162,7 @@ function change(target, key, value, options) {
 		};
 	})());
 }
+
 function triggerParent(obj, key, next, prev) {
 	return new Promise((() => {
 		var _ref4 = _asyncToGenerator(function* (resolve) {
@@ -205,18 +203,15 @@ function update(target, props = {}, options) {
 }
 // Listener specifically for handle data mutations
 function observe(obj, prop, observer) {
-	return new Promise(resolve => {
-		listen(obj, 'change', (() => {
-			var _ref6 = _asyncToGenerator(function* ({ key, next, prev }) {
-				if (typeof prop === 'function' && !observer) yield prop(key, next, prev);else if (typeof prop === 'string' && typeof observer === 'function') yield observer(next, prev);
-				yield resolve();
-			});
+	return listen(obj, 'change', (() => {
+		var _ref6 = _asyncToGenerator(function* ({ key, next, prev }) {
+			if (typeof prop === 'function' && !observer) yield prop(key, next, prev);else if (typeof prop === 'string' && typeof observer === 'function') yield observer(next, prev);
+		});
 
-			return function (_x5) {
-				return _ref6.apply(this, arguments);
-			};
-		})());
-	});
+		return function (_x5) {
+			return _ref6.apply(this, arguments);
+		};
+	})());
 }
 // Get reference
 function reference(obj = {}) {
@@ -231,16 +226,6 @@ function observable(obj = {}) {
 				const result = target[prop];
 				if (typeof result === 'function') {
 					return result;
-					// return (...args) => new Promise(resolve => {
-					// 	queue(target).push(async () => {
-					// 		let output = await result.apply(target, args)
-					// 		if (output && output instanceof Object) {
-					// 			output = observable(output)
-					// 		}
-					// 		resolve(output)
-					// 	})
-					// 	invoke(obj)
-					// })
 				}
 				if (result && result instanceof Object) {
 					define(result, PARENT, target);
@@ -266,6 +251,15 @@ function observable(obj = {}) {
 	return obj[PROXY];
 }
 
+// export default {
+// 	observe,
+// 	update,
+// 	trigger,
+// 	change,
+// 	listen,
+// 	intercept
+// }
+
 exports.id = id;
 exports.define = define;
 exports.pending = pending;
@@ -285,3 +279,7 @@ exports.update = update;
 exports.observe = observe;
 exports.reference = reference;
 exports.observable = observable;
+
+Object.defineProperty(exports, '__esModule', { value: true });
+
+})));
